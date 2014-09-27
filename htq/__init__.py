@@ -18,4 +18,9 @@ def get_version(short=False):
 
 __version__ = get_version()
 
-from .api import *  # noqa
+
+# Prevent import errors during setup/installation phase
+try:
+    from .api import *  # noqa
+except ImportError:
+    pass
