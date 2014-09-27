@@ -59,12 +59,19 @@ def _encode_request(r):
     if 'headers' in r:
         r['headers'] = json.dumps(r['headers'])
 
+    # Remove empty data so it is not stringified as 'None'
+    if 'data' in r and r['data'] is None:
+        r.pop('data')
+
     return r
 
 
 def _decode_request(r):
     if not r:
         return
+
+    if 'data' not in r:
+        r['data'] = None
 
     r['timeout'] = int(r['timeout'])
     r['time'] = int(r['time'])
