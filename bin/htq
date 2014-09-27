@@ -39,8 +39,8 @@ def run_worker(options):
 
     def worker(queue):
         while True:
-            req = queue.get()
-            htq.receive(req['uuid'])
+            uuid = queue.get()
+            htq.receive(uuid)
             queue.task_done()
 
     # Shared queue
