@@ -1,0 +1,17 @@
+[run]
+branch = True
+source = htq
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    def __str__
+    def __bytes__
+    def __unicode__
+    except NameError:
+    raise EnvironmentError
+    raise AssertionError
+    raise NotImplemented(Error)?
+    if 0:
+    if __name__ == .__main__.:

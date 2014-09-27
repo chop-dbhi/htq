@@ -1,0 +1,4 @@
+include LICENSE
+include README.md
+global-exclude .DS_Store
+prune tests

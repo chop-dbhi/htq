@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+# vim:ft=python
+
+"""HTTP Task Queue (htq) command-line interface
+
+Usage:
+    htq server [--debug]
+    htq worker [--debug] [--threads 100]
+
+Options:
+    -h --help           Show this screen.
+    -v --version        Show version.
+    --debug             Turns on debug logging.
+    --threads           Number of threads a worker uses (default 100)
+"""
+
+import logging
+from docopt import docopt
+from htq import logger
+
+
+def run_server(options):
+    from htq import service
+
+    logger.info('Starting htq REST server...')
+    service.app.run(debug=options['--debug'])
+
+
+def run_worker(options):
+    from queue import Queue
+    from threading import Thread
+    import htq
+    from htq.utils import iter_queue
+
+    if options['--threads']:
+        threads = int(options['--threads'])
+    else:
+        threads = 100
+
+    def worker(queue):
+        while True:
+            req = queue.get()
+            htq.receive(req['uuid'])
+            queue.task_done()
+
+    # Shared queue
+    queue = Queue()
+
+    try:
+        for i in range(threads):
+            t = Thread(target=worker, args=(queue,), daemon=True)
+            t.start()
+
+        logger.info('Started {} workers...'.format(threads))
+
+        # Fill queue as tasks become available
+        for uuid in iter_queue():
+            queue.put(uuid)
+
+    except (KeyboardInterrupt, SystemExit):
+        logger.info('Finishing queue...')
+        queue.join()
+        logger.info('Done.')
+
+
+# Parse options
+options = docopt(__doc__, version='htq 0.1.0')
+
+
+# Turn on logging INFO or DEBUG
+handler = logging.StreamHandler()
+logger.addHandler(handler)
+
+# Turn on debug logging to stdout
+if options['--debug']:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
+
+
+# Run the command
+if options['server']:
+    run_server(options)
+
+elif options['worker']:
+    run_worker(options)

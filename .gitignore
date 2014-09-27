@@ -1,0 +1,9 @@
+*.py?
+*.sw?
+*.egg-info
+.coverage
+MANIFEST
+dist
+htmlcov
+.ipynb_checkpoints
+*.ipynb

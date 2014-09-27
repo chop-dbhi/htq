@@ -1,0 +1,26 @@
+language: python
+
+python:
+    - "3.3"
+    - "3.4"
+
+services:
+    - redis-server
+
+before_install:
+    - sh bin/check_signoff.sh
+
+install:
+    - pip install -q coveralls flake8
+      # Required feature is not yet released
+    - pip install https://github.com/dropbox/responses/archive/master.zip
+    - pip install -q -e .
+
+before_script:
+    - flake8
+
+script:
+    - coverage run test_suite.py
+
+after_success:
+    - coveralls > /dev/null
