@@ -44,12 +44,18 @@ class TestCase(unittest.TestCase):
         req = htq.request(uuid)
         resp = htq.response(uuid)
 
-        self.assertEqual(req['status'], 'success')
+        self.assertEqual(req['status'], htq.SUCCESS)
         self.assertEqual(resp['code'], 200)
         self.assertEqual(resp['data'], '{"ok": 1}')
         self.assertEqual(resp['headers'], {
             'Content-Type': 'application/json',
         })
+
+    @responses.activate
+    def test_status(self):
+        htq.send(url)
+        uuid = htq.pop()
+        self.assertEqual(htq.status(uuid), htq.QUEUED)
 
     @responses.activate
     def test_post(self):
@@ -60,7 +66,7 @@ class TestCase(unittest.TestCase):
         uuid = htq.pop()
         resp = htq.receive(uuid)
 
-        self.assertEqual(resp['status'], 'success')
+        self.assertEqual(resp['status'], htq.SUCCESS)
 
     def test_error(self):
         htq.send('http://localhost:9999')
@@ -70,8 +76,8 @@ class TestCase(unittest.TestCase):
         resp = htq.receive(uuid)
         req = htq.request(uuid)
 
-        self.assertEqual(resp['status'], 'error')
-        self.assertEqual(req['status'], 'error')
+        self.assertEqual(resp['status'], htq.ERROR)
+        self.assertEqual(req['status'], htq.ERROR)
 
     @responses.activate
     def test_cancel_queued(self):
@@ -86,7 +92,7 @@ class TestCase(unittest.TestCase):
 
         req = htq.request(uuid)
         resp = htq.response(uuid)
-        self.assertEqual(req['status'], 'canceled')
+        self.assertEqual(req['status'], htq.CANCELED)
         self.assertIsNone(resp)
 
     @responses.activate
@@ -101,7 +107,7 @@ class TestCase(unittest.TestCase):
 
         req = htq.request(uuid)
         resp = htq.response(uuid)
-        self.assertEqual(req['status'], 'canceled')
+        self.assertEqual(req['status'], htq.CANCELED)
         self.assertIsNone(resp)
 
     @responses.activate

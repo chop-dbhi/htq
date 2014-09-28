@@ -10,6 +10,7 @@ __all__ = (
     'send',
     'receive',
     'request',
+    'status',
     'response',
     'pop',
     'cancel',
@@ -176,6 +177,13 @@ def request(uuid):
     req = client.hgetall(REQ_PREFIX + uuid)
 
     return _decode_request(req)
+
+
+def status(uuid):
+    "Get the request status by UUID."
+    client = get_redis_client()
+
+    return client.hget(REQ_PREFIX + uuid, 'status')
 
 
 def cancel(uuid):

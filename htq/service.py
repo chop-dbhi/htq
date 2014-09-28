@@ -1,3 +1,4 @@
+import time
 import json
 from flask import Flask, abort, make_response, url_for, request as http_request
 import htq
@@ -85,6 +86,15 @@ def request(uuid):
     return resp
 
 
+@app.route('/<uuid>/status/', methods=['get'])
+def status(uuid):
+    "Returns the status of the request."
+    status = htq.status(uuid)
+
+    if not status:
+        abort(404)
+
+    resp = make_response(json.dumps({'status': status}), 200)
     resp.headers['Content-Type'] = 'application/json'
 
     return resp
@@ -102,22 +112,32 @@ def cancel(uuid):
 
 @app.route('/<uuid>/response/', methods=['get'])
 def response(uuid):
-    rp = htq.response(uuid)
+    status = htq.status(uuid)
 
-    if not rp:
+    if not status:
         abort(404)
 
-    rp['links'] = {
-        'self': {
-            'href': url_for('response', uuid=uuid, _external=True),
-        },
-        'request': {
-            'href': url_for('get', uuid=uuid, _external=True),
-        }
-    }
+    # Block until ready
+    while True:
+        # Poll status until it is complete
+        if status not in {htq.QUEUED, htq.PENDING}:
+            break
+
+        time.sleep(0.1)
+        status = htq.status(uuid)
+
+    rp = htq.response(uuid)
 
     resp = make_response(json.dumps(rp), 200)
     resp.headers['Content-Type'] = 'application/json'
+    resp.headers['Link'] = build_link_header({
+        url_for('response', uuid=uuid, _external=True): {
+            'rel': 'self',
+        },
+        url_for('request', uuid=uuid, _external=True): {
+            'rel': 'request',
+        },
+    })
 
     return resp
 

@@ -58,6 +58,17 @@ class TestCase(unittest.TestCase):
         self.assertIn('status', json.loads(resp.data.decode('utf8')))
 
     @responses.activate
+    def test_status(self):
+        resp = app.post('/', data=json.dumps({
+            'url': url,
+        }), headers={'content-type': 'application/json'})
+
+        resp = app.get(resp.location + 'status/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(json.loads(resp.data.decode('utf8')),
+                         {'status': 'queued'})
+
+    @responses.activate
     def test_response(self):
         resp = app.post('/', data=json.dumps({
             'url': url,
