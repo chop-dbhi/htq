@@ -4,12 +4,25 @@ import responses
 import htq
 from htq import service
 from htq.api import get_redis_client
+from requests.utils import parse_header_links as phl
+
 
 url = 'http://localhost/'
 
 client = get_redis_client()
 
 app = service.app.test_client()
+
+
+def parse_header_links(value):
+    _links = phl(value)
+    links = {}
+
+    for l in _links:
+        key = l.get('rel') or l.get('url')
+        links[key] = l['url']
+
+    return links
 
 
 class TestCase(unittest.TestCase):
@@ -42,7 +55,7 @@ class TestCase(unittest.TestCase):
         resp = app.get(resp.location)
 
         self.assertEqual(resp.status_code, 200)
-        self.assertIn('links', json.loads(resp.data.decode('utf8')))
+        self.assertIn('status', json.loads(resp.data.decode('utf8')))
 
     @responses.activate
     def test_response(self):
@@ -56,11 +69,11 @@ class TestCase(unittest.TestCase):
         htq.receive(htq.pop())
 
         resp = app.get(location)
-        data = json.loads(resp.data.decode('utf8'))
 
-        self.assertIn('response', data['links'])
+        self.assertIn('response', resp.headers['Link'])
 
-        response_url = data['links']['response']['href']
+        links = parse_header_links(resp.headers['Link'])
+        response_url = links['response']
 
         resp = app.get(response_url)
         self.assertEqual(resp.status_code, 200)

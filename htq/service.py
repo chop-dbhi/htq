@@ -1,6 +1,38 @@
 import json
-from flask import Flask, request, abort, make_response, url_for
+from flask import Flask, abort, make_response, url_for, request as http_request
 import htq
+
+
+def build_link_header(links):
+    """Builds a Link header according to RFC 5988.
+
+    The format is a dict where the keys are the URI with the value being
+    a dict of link parameters:
+
+        {
+            '/page=3': {
+                'rel': 'next',
+            },
+            '/page=1': {
+                'rel': 'prev',
+            },
+            ...
+        }
+
+    See https://tools.ietf.org/html/rfc5988#section-6.2.2 for registered
+    link relation types.
+    """
+    _links = []
+
+    for uri, params in links.items():
+        link = ['<' + uri + '>']
+
+        for key, value in params.items():
+            link.append(key + '="' + str(value) + '"')
+
+        _links.append('; '.join(link))
+
+    return ', '.join(_links)
 
 
 app = Flask('htq')
@@ -8,7 +40,7 @@ app = Flask('htq')
 
 @app.route('/', methods=['post'])
 def send():
-    json = request.json
+    json = http_request.json
 
     if 'url' not in json:
         abort(422)
@@ -27,32 +59,32 @@ def send():
 
     # Redirect to request endpoint
     resp = make_response('', 303)
-    resp.headers['Location'] = url_for('get', uuid=req['uuid'],
+    resp.headers['Location'] = url_for('request', uuid=req['uuid'],
                                        _external=True)
     return resp
 
 
 @app.route('/<uuid>/', methods=['get'])
-def get(uuid):
+def request(uuid):
     req = htq.request(uuid)
 
     if req is None:
         abort(404)
 
-    req['links'] = {
-        'self': {
-            'href': url_for('get', uuid=uuid, _external=True),
-        }
-    }
-
-    # Add link to response if the request is complete
-    if req['status'] in {htq.SUCCESS, htq.ERROR, htq.TIMEOUT}:
-        req['links']['response'] = {
-            'href': url_for('response', uuid=uuid,
-                            _external=True)
-        }
-
     resp = make_response(json.dumps(req), 200)
+    resp.headers['Content-Type'] = 'application/json'
+    resp.headers['Link'] = build_link_header({
+        url_for('request', uuid=uuid, _external=True): {
+            'rel': 'self',
+        },
+        url_for('response', uuid=uuid, _external=True): {
+            'rel': 'response',
+        }
+    })
+
+    return resp
+
+
     resp.headers['Content-Type'] = 'application/json'
 
     return resp
