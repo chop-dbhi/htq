@@ -44,6 +44,11 @@ class TestCase(unittest.TestCase):
                       status=201)
 
     @responses.activate
+    def test_root(self):
+        resp = app.get('/')
+        self.assertIn('Link', resp.headers)
+
+    @responses.activate
     def test_send(self):
         resp = app.post('/', data=json.dumps({
             'url': url,

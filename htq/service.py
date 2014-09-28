@@ -39,6 +39,18 @@ def build_link_header(links):
 app = Flask('htq')
 
 
+@app.route('/', methods=['get'])
+def root():
+    resp = make_response('', 200)
+    resp.headers['Link'] = build_link_header({
+        url_for('root', _external=True): {
+            'rel': 'self',
+        }
+    })
+
+    return resp
+
+
 @app.route('/', methods=['post'])
 def send():
     json = http_request.json
