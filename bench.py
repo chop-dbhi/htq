@@ -16,17 +16,17 @@ def run(n):
     t0 = time.time()
 
     for i in range(n):
-        htq.enqueue('http://localhost/' + str(i))
+        htq.send('http://localhost/' + str(i))
 
-    print('enqueued {} in {}'.format(n, time.time() - t0))
+    print('sent {} in {}'.format(n, time.time() - t0))
 
     t0 = time.time()
 
     for i in range(n):
         uuid = htq.pop()
-        htq.dequeue(uuid)
+        htq.receive(uuid)
 
-    print('dequeued {} in {}'.format(n, time.time() - t0))
+    print('received {} in {}'.format(n, time.time() - t0))
 
 
 if __name__ == '__main__':
