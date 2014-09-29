@@ -40,10 +40,20 @@ app = Flask('htq')
 
 
 @app.route('/', methods=['get'])
-def root():
-    resp = make_response('', 200)
+def queue():
+    reqs = []
+
+    for req in htq.queued():
+        req['links'] = {
+            'self': url_for('request', uuid=req['uuid'], _external=True),
+            'status': url_for('status', uuid=req['uuid'], _external=True),
+            'response': url_for('response', uuid=req['uuid'], _external=True),
+        }
+        reqs.append(req)
+
+    resp = make_response(json.dumps(reqs), 200)
     resp.headers['Link'] = build_link_header({
-        url_for('root', _external=True): {
+        url_for('queue', _external=True): {
             'rel': 'self',
         }
     })

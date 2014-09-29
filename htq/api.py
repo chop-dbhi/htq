@@ -9,6 +9,7 @@ from uuid import uuid4
 __all__ = (
     'send',
     'receive',
+    'queued',
     'request',
     'status',
     'response',
@@ -173,6 +174,21 @@ def push(uuid):
     client = get_redis_client()
 
     client.lpush(REQ_SEND_QUEUE, uuid)
+
+
+def queued():
+    "Returns all queued requests."
+    client = get_redis_client()
+
+    stop = client.llen(REQ_SEND_QUEUE)
+
+    reqs = []
+
+    # Get the full range
+    for uuid in client.lrange(REQ_SEND_QUEUE, 0, stop):
+        reqs.append(_decode_request(client.hgetall(REQ_PREFIX + uuid)))
+
+    return reqs
 
 
 def size():

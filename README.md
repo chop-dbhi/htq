@@ -23,8 +23,9 @@ htq worker
 
 **REST**
 
-*Requires `htq server`*
+*Requires `htq server` to be running. `htq worker` must be running to actually send and receive the requests.*
 
+- `GET /` - Gets all queued requests.
 - `POST /` - Sends (queues) a request
 - `GET /<uuid>/` - Gets a request by UUID
 - `DELETE /<uuid>/` - Cancels a request, deleting it's response if already received
