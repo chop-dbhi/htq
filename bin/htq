@@ -37,18 +37,28 @@ def run_worker(options):
     else:
         threads = 100
 
-    def worker(queue):
-        while True:
-            uuid = queue.get()
-            htq.receive(uuid)
-            queue.task_done()
+    class Worker(Thread):
+        def __init__(self, queue, *args, **kwargs):
+            self.queue = queue
+            Thread.__init__(self, *args, **kwargs)
+
+        def run(self):
+            while True:
+                uuid = self.queue.get()
+
+                try:
+                    htq.receive(uuid)
+                except Exception:
+                    self.queue.put(uuid)
+                finally:
+                    self.queue.task_done()
 
     # Shared queue
     queue = Queue()
 
     try:
         for i in range(threads):
-            t = Thread(target=worker, args=(queue,), daemon=True)
+            t = Worker(queue, daemon=True)
             t.start()
 
         logger.info('Started {} workers...'.format(threads))
