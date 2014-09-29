@@ -8,7 +8,7 @@ The HTTP Task Queue provides buffering between sending requests and receiving re
 - A worker sends the request in the background and stores the response to be retrieved by the client.
 - Once the request's status is in the `success`, `error`, or `timeout` state, the response is ready to be accessed.
 
-See the [example](#example) below.
+See the [tutorial](#tutorial) below for further explanation.
 
 ## Dependencies
 
