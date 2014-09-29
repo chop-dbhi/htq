@@ -90,6 +90,9 @@ def request(uuid):
         url_for('request', uuid=uuid, _external=True): {
             'rel': 'self',
         },
+        url_for('status', uuid=uuid, _external=True): {
+            'rel': 'status',
+        },
         url_for('response', uuid=uuid, _external=True): {
             'rel': 'response',
         }
