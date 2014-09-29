@@ -4,6 +4,7 @@ import redis
 import requests
 import logging
 from uuid import uuid4
+from .db import get_redis_client
 
 
 __all__ = (
@@ -104,18 +105,6 @@ def _decode_response(r):
         r['headers'] = json.loads(r['headers'])
 
     return r
-
-
-_redis_client = None
-
-
-def get_redis_client():
-    global _redis_client
-
-    if not _redis_client:
-        _redis_client = redis.StrictRedis(decode_responses=True)
-
-    return _redis_client
 
 
 def send(url, method=None, data=None, headers=None, timeout=None):

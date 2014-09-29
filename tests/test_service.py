@@ -3,7 +3,7 @@ import unittest
 import responses
 import htq
 from htq import service
-from htq.api import get_redis_client
+from htq.db import get_redis_client
 from requests.utils import parse_header_links as phl
 
 

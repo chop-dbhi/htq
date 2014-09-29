@@ -1,7 +1,7 @@
 import unittest
 import responses
 import htq
-from htq.api import get_redis_client
+from htq.db import get_redis_client
 
 
 url = 'http://localhost/'

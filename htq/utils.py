@@ -1,4 +1,5 @@
-from .api import get_redis_client, REQ_SEND_QUEUE
+from .api import REQ_SEND_QUEUE
+from .db import get_redis_client
 
 
 def iter_queue():

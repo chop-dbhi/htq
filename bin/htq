@@ -4,26 +4,36 @@
 """HTTP Task Queue (htq) command-line interface
 
 Usage:
-    htq server [--debug]
-    htq worker [--debug] [--threads 100]
+    htq server [--host <host>] [--port <port>] [--redis <redis>] [--debug]
+    htq worker [--threads <n>] [--redis <redis>] [--debug]
 
 Options:
     -h --help           Show this screen.
     -v --version        Show version.
     --debug             Turns on debug logging.
-    --threads           Number of threads a worker uses (default 100)
-"""
+    --host <host>       Host of the HTTP service [default: localhost].
+    --port <port>       Port of the HTTP service [default: 5000].
+    --redis <redis>     Host/port of the Redis server [default: localhost:6379].
+    --threads <n>       Number of threads a worker should spawn [default: 10].
+"""  # noqa
 
 import logging
 from docopt import docopt
 from htq import logger
+from htq.db import get_redis_client
 
 
 def run_server(options):
     from htq import service
 
+    host = options['--host']
+    port = int(options['--port'])
+    debug = options['--debug']
+
     logger.info('Starting htq REST server...')
-    service.app.run(debug=options['--debug'])
+    service.app.run(host=host,
+                    port=port,
+                    debug=debug)
 
 
 def run_worker(options):
@@ -32,10 +42,7 @@ def run_worker(options):
     import htq
     from htq.utils import iter_queue
 
-    if options['--threads']:
-        threads = int(options['--threads'])
-    else:
-        threads = 100
+    threads = int(options['--threads'])
 
     class Worker(Thread):
         def __init__(self, queue, *args, **kwargs):
@@ -76,7 +83,6 @@ def run_worker(options):
 # Parse options
 options = docopt(__doc__, version='htq 0.1.0')
 
-
 # Turn on logging INFO or DEBUG
 handler = logging.StreamHandler()
 logger.addHandler(handler)
@@ -86,6 +92,25 @@ if options['--debug']:
     logger.setLevel(logging.DEBUG)
 else:
     logger.setLevel(logging.INFO)
+
+
+if options['--redis']:
+    # Includes db index
+    if '/' in options['--redis']:
+        host, db = options['--redis'].split('/')
+        db = int(db)
+    else:
+        host = options['--redis']
+        db = 0
+
+    if ':' in host:
+        host, port = host.split(':')
+        port = int(port)
+    else:
+        port = 6379
+
+    # Sets the global connection
+    get_redis_client(host=host, port=port, db=db)
 
 
 # Run the command
