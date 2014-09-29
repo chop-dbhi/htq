@@ -13,6 +13,7 @@ __all__ = (
     'status',
     'response',
     'pop',
+    'push',
     'cancel',
     'purge',
     'size',
@@ -161,6 +162,17 @@ def pop():
     client = get_redis_client()
 
     return client.brpop(REQ_SEND_QUEUE)[1]
+
+
+def push(uuid):
+    """Pushes a UUID into the queue.
+
+    This provides a means to recover the queue in case of an error
+    downstream.
+    """
+    client = get_redis_client()
+
+    client.lpush(REQ_SEND_QUEUE, uuid)
 
 
 def size():
