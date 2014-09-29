@@ -176,7 +176,7 @@ The response contains all the elements of an HTTP response including code, reaso
 
 ### Canceling a request
 
-This is called the HTTP **Task** Queue because it was developed to support a common need when using a service-based communication (e.g. request/response) for performing a task such as executing a database query, performing an analysis, etc. Once the request is sent the client could abort the request however the server will continue to execute the task. htq defines an interface for services to implement for allowing requests to be canceled. For example, if I send a request that is taking longer than I expect (delayed for 30 seconds):
+HTQ defines an interface for services to implement for allowing requests to be canceled. For example, if I send a request that is taking longer than I expect (delayed for 30 seconds):
 
 ```bash
 $ curl -i -X POST -H Content-Type:application/json http://localhost:5000 -d '{"url": "http://httpbin.org/delay/30"}'
