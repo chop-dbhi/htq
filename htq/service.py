@@ -151,7 +151,7 @@ def response(uuid):
         time.sleep(0.1)
         status = htq.status(uuid)
 
-    rp = htq.response(uuid)
+    rp = htq.response(uuid) or {}
 
     resp = make_response(json.dumps(rp), 200)
     resp.headers['Content-Type'] = 'application/json'
