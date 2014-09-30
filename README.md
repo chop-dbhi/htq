@@ -6,12 +6,28 @@ In this context, a *task* is classified as something that may take longer than w
 
 For a detailed introduction, read the [tutorial](#tutorial) below.
 
-## Dependencies
+## Docker
+
+*Requires a Redis 2.4+ container.*
+
+Run the server.
+
+```
+docker run -d --link redis:redis bruth/htq server
+```
+
+Run a worker.
+
+```
+docker run -d --link redis:redis bruth/htq worker
+```
+
+## Manual Install
+
+### Dependencies
 
 - Python 3.3+
 - Redis 2.4+
-
-## Install
 
 ```
 pip install htq
