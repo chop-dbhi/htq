@@ -4,12 +4,18 @@ The motivation for this project is to provide a standard interface for sending a
 
 In this context, a *task* is classified as something that may take longer than what is appropriate for a typical HTTP response or something that is allowed to be eventually completed. Examples include executing a database query, running an analysis on some data, and injesting/scraping data from websites or other services. One side effect of the client-server model is that the server may not be aware if the client aborts the request. The server will continue to perform the task using up resources that other tasks or request handlers could be using. The mechanism for signaling a cancellation is for a subsequent DELETE request to be sent to the service which can be handled to interrupt the first request. This of course requires services to support the DELETE method and implement the logic for cancelling the task being performed. See below for a working example of a [service](#service-example) implementing this interface.
 
-For a detailed introduction, read the [tutorial](#tutorial) below. 
+For a detailed introduction, read the [tutorial](#tutorial) below.
 
 ## Dependencies
 
 - Python 3.3+
 - Redis 2.4+
+
+## Install
+
+```
+pip install htq
+```
 
 ## Command-line Interface
 
