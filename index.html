@@ -30,14 +30,11 @@
         <h1>
 <a name="http-task-queue-htq" class="anchor" href="#http-task-queue-htq"><span class="octicon octicon-link"></span></a>HTTP Task Queue (htq)</h1>
 
-<p>The HTTP Task Queue provides buffering between sending requests and receiving responses.</p>
+<p>The motivation for this project is to provide a standard interface for sending a request in the background to a service that performs some task with a standard mechanism for signaling it to be <em>cancelled</em>.</p>
 
-<ul>
-<li>The client POSTs a description of a request to be sent at a later time</li>
-<li>The client recieves an immediate response with a 303 See Other to the queued request with a status. This also contains a link to the response to be accessed once it has been received.</li>
-<li>A worker sends the request in the background and stores the response to be retrieved by the client.</li>
-<li>Once the request's status is in the <code>success</code>, <code>error</code>, or <code>timeout</code> state, the response is ready to be accessed.</li>
-</ul><p>See the <a href="#tutorial">tutorial</a> below for further explanation.</p>
+<p>In this context, a <em>task</em> is classified as something that may take longer than what is appropriate for a typical HTTP response or something that is allowed to be eventually completed. Examples include executing a database query, running an analysis on some data, and injesting/scraping data from websites or other services. One side effect of the client-server model is that the server may not be aware if the client aborts the request. The server will continue to perform the task using up resources that other tasks or request handlers could be using. The mechanism for signaling a cancellation is for a subsequent DELETE request to be sent to the service which can be handled to interrupt the first request. This of course requires services to support the DELETE method and implement the logic for cancelling the task being performed. See below for a working example of a <a href="#service-example">service</a> implementing this interface.</p>
+
+<p>For a detailed introduction, read the <a href="#tutorial">tutorial</a> below. </p>
 
 <h2>
 <a name="dependencies" class="anchor" href="#dependencies"><span class="octicon octicon-link"></span></a>Dependencies</h2>
@@ -205,7 +202,7 @@ Date: Mon, <span class="m">29</span> Sep <span class="m">2014</span> 17:38:22 GM
 <h3>
 <a name="canceling-a-request" class="anchor" href="#canceling-a-request"><span class="octicon octicon-link"></span></a>Canceling a request</h3>
 
-<p>This is called the HTTP <strong>Task</strong> Queue because it was developed to support a common need when using a service-based communication (e.g. request/response) for performing a task such as executing a database query, performing an analysis, etc. Once the request is sent the client could abort the request however the server will continue to execute the task. htq defines an interface for services to implement for allowing requests to be canceled. For example, if I send a request that is taking longer than I expect (delayed for 30 seconds):</p>
+<p>HTQ defines an interface for services to implement for allowing requests to be canceled. For example, if I send a request that is taking longer than I expect (delayed for 30 seconds):</p>
 
 <div class="highlight highlight-bash"><pre><span class="nv">$ </span>curl -i -X POST -H Content-Type:application/json http://localhost:5000 -d <span class="s1">'{"url": "http://httpbin.org/delay/30"}'</span>
 HTTP/1.0 <span class="m">303</span> SEE OTHER
@@ -239,6 +236,90 @@ Date: Mon, <span class="m">29</span> Sep <span class="m">2014</span> 18:01:23 GM
 </pre></div>
 
 <p>Internally this interrupts the request, but also sends a DELETE request to the endpoint (in this <code>http://httpbin.org/delay/30</code>). Implementors of services can support the DELETE request to cancel the underlying processing that is occurring. Of course this is specific to the underlying task being performed, but this simple service-level contract provides a consistent mechanism for signaling the the cancellation.</p>
+
+<h2>
+<a name="service-example" class="anchor" href="#service-example"><span class="octicon octicon-link"></span></a>Service Example</h2>
+
+<p>Below is a working example of a service that implements the interface HTQ requires for receiving the DELETE to signal the cancellation. This service takes a JSON-encoded statement and parameters and executes them in a local PostgreSQL instance (for simplicity, the database settings are hard-coded).</p>
+
+<div class="highlight highlight-python"><pre><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+<span class="kn">from</span> <span class="nn">flask</span> <span class="kn">import</span> <span class="n">Flask</span><span class="p">,</span> <span class="n">abort</span><span class="p">,</span> <span class="n">request</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+<span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+<span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+<span class="c"># Database connection settings</span>
+<span class="n">settings</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">'dbname'</span><span class="p">:</span> <span class="s">'example'</span><span class="p">,</span>
+    <span class="s">'host'</span><span class="p">:</span> <span class="s">'localhost'</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="c"># Currently running tasks by UUID mapped to the</span>
+<span class="c"># connection process ID</span>
+<span class="n">tasks</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="nd">@app.route</span><span class="p">(</span><span class="s">'/&lt;uuid&gt;/'</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s">'POST'</span><span class="p">])</span>
+<span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">uuid</span><span class="p">):</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">json</span>
+
+    <span class="n">conn</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="o">**</span><span class="n">settings</span><span class="p">)</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+    <span class="c"># Store the PID of the connection execute this task</span>
+    <span class="n">pid</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">get_backend_pid</span><span class="p">()</span>
+    <span class="n">tasks</span><span class="p">[</span><span class="n">uuid</span><span class="p">]</span> <span class="o">=</span> <span class="n">pid</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">'[{}] executing query for {}...'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span> <span class="n">uuid</span><span class="p">))</span>
+        <span class="n">c</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s">'statement'</span><span class="p">],</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">'parameters'</span><span class="p">))</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">conn</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+        <span class="n">abort</span><span class="p">(</span><span class="mi">500</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">tasks</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">uuid</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()),</span> <span class="mi">200</span>
+
+
+<span class="nd">@app.route</span><span class="p">(</span><span class="s">'/&lt;uuid&gt;/'</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s">'DELETE'</span><span class="p">])</span>
+<span class="k">def</span> <span class="nf">cancel</span><span class="p">(</span><span class="n">uuid</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">uuid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">tasks</span><span class="p">:</span>
+        <span class="n">abort</span><span class="p">(</span><span class="mi">404</span><span class="p">)</span>
+
+    <span class="n">pid</span> <span class="o">=</span> <span class="n">tasks</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">uuid</span><span class="p">)</span>
+
+    <span class="c"># Open new connection to cancel the query</span>
+    <span class="n">conn</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="o">**</span><span class="n">settings</span><span class="p">)</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+    <span class="n">c</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s">'select pg_terminate_backend(</span><span class="si">%s</span><span class="s">)'</span><span class="p">,</span> <span class="p">(</span><span class="n">pid</span><span class="p">,))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">'[{}] canceled query for {}'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span> <span class="n">uuid</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="s">''</span><span class="p">,</span> <span class="mi">204</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">'__main__'</span><span class="p">:</span>
+    <span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">threaded</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+
+<p>The interaction looks as follows:</p>
+
+<div class="highlight highlight-bash"><pre>% python example_service.py
+ * Running on http://127.0.0.1:5000/
+<span class="o">[</span>57819<span class="o">]</span> executing query <span class="k">for</span> abc123...
+<span class="o">[</span>57819<span class="o">]</span> canceled query <span class="k">for</span> abc123
+127.0.0.1 - - <span class="o">[</span>30/Sep/2014 11:16:01<span class="o">]</span> <span class="s2">"DELETE /abc123/ HTTP/1.1"</span> <span class="m">204</span> -
+127.0.0.1 - - <span class="o">[</span>30/Sep/2014 11:16:02<span class="o">]</span> <span class="s2">"POST /abc123/ HTTP/1.1"</span> <span class="m">500</span> -
+</pre></div>
+
+<p>A POST request was first sent to execute a query. A DELETE request was sent shortly after to cancel the query and returns. When the POST request does respond it is a 500 complaining the connection was closed (which is what we wanted).</p>
       </section>
     </div>
     <footer>
