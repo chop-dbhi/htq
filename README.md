@@ -1,14 +1,10 @@
 # HTTP Task Queue (htq)
 
-The HTTP Task Queue provides buffering between sending requests and receiving responses.
+The motivation for this project is to provide a standard interface for sending a request in the background to a service that performs some task with a standard mechanism for signaling it to be *cancelled*.
 
+In this context, a *task* is classified as something that may take longer than what is appropriate for a typical HTTP response or something that is allowed to be eventually completed. Examples include executing a database query, running an analysis on some data, and injesting/scraping data from websites or other services. One side effect of the client-server model is that the server may not be aware if the client aborts the request. The server will continue to perform the task using up resources that other tasks or request handlers could be using. The mechanism for signaling a cancellation is for a subsequent DELETE request to be sent to the service which can be handled to interrupt the first request. This of course requires services to support the DELETE method and implement the logic for cancelling the task being performed. See below for a working example of a [service](#service-example) implementing this interface.
 
-- The client POSTs a description of a request to be sent at a later time
-- The client recieves an immediate response with a 303 See Other to the queued request with a status. This also contains a link to the response to be accessed once it has been received.
-- A worker sends the request in the background and stores the response to be retrieved by the client.
-- Once the request's status is in the `success`, `error`, or `timeout` state, the response is ready to be accessed.
-
-See the [tutorial](#tutorial) below for further explanation.
+For a detailed introduction, read the [tutorial](#tutorial) below. 
 
 ## Dependencies
 
@@ -213,3 +209,88 @@ Date: Mon, 29 Sep 2014 18:01:23 GMT
 ```
 
 Internally this interrupts the request, but also sends a DELETE request to the endpoint (in this `http://httpbin.org/delay/30`). Implementors of services can support the DELETE request to cancel the underlying processing that is occurring. Of course this is specific to the underlying task being performed, but this simple service-level contract provides a consistent mechanism for signaling the the cancellation.
+
+## Service Example
+
+Below is a working example of a service that implements the interface HTQ requires for receiving the DELETE to signal the cancellation. This service takes a JSON-encoded statement and parameters and executes them in a local PostgreSQL instance (for simplicity, the database settings are hard-coded).
+
+```python
+import json
+import logging
+import psycopg2
+from flask import Flask, abort, request
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+logger.addHandler(handler)
+
+app = Flask(__name__)
+
+# Database connection settings
+settings = {
+    'dbname': 'example',
+    'host': 'localhost',
+}
+
+# Currently running tasks by UUID mapped to the
+# connection process ID
+tasks = {}
+
+
+@app.route('/<uuid>/', methods=['POST'])
+def run(uuid):
+    data = request.json
+
+    conn = psycopg2.connect(**settings)
+    c = conn.cursor()
+
+    # Store the PID of the connection execute this task
+    pid = conn.get_backend_pid()
+    tasks[uuid] = pid
+
+    try:
+        logger.debug('[{}] executing query for {}...'.format(pid, uuid))
+        c.execute(data['statement'], data.get('parameters'))
+    except:
+        conn.cancel()
+        abort(500)
+    finally:
+        tasks.pop(uuid, None)
+
+    return json.dumps(c.fetchall()), 200
+
+
+@app.route('/<uuid>/', methods=['DELETE'])
+def cancel(uuid):
+    if uuid not in tasks:
+        abort(404)
+
+    pid = tasks.pop(uuid)
+
+    # Open new connection to cancel the query
+    conn = psycopg2.connect(**settings)
+    c = conn.cursor()
+
+    c.execute('select pg_terminate_backend(%s)', (pid,))
+    logger.debug('[{}] canceled query for {}'.format(pid, uuid))
+
+    return '', 204
+
+
+if __name__ == '__main__':
+    app.run(threaded=True)
+```
+
+The interaction looks as follows:
+
+```bash
+% python example_service.py
+ * Running on http://127.0.0.1:5000/
+[57819] executing query for abc123...
+[57819] canceled query for abc123
+127.0.0.1 - - [30/Sep/2014 11:16:01] "DELETE /abc123/ HTTP/1.1" 204 -
+127.0.0.1 - - [30/Sep/2014 11:16:02] "POST /abc123/ HTTP/1.1" 500 -
+```
+
+A POST request was first sent to execute a query. A DELETE request was sent shortly after to cancel the query and returns. When the POST request does respond it is a 500 complaining the connection was closed (which is what we wanted).
