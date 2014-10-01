@@ -10,10 +10,10 @@ For a detailed introduction, read the [tutorial](#tutorial) below.
 
 *Requires a Redis 2.4+ container.*
 
-Run the server.
+Run the server on local port 5000.
 
 ```
-docker run -d --link redis:redis bruth/htq server
+docker run -d --link redis:redis --publish 5000:5000 bruth/htq server
 ```
 
 Run a worker.
