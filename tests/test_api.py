@@ -120,3 +120,18 @@ class TestCase(unittest.TestCase):
 
         resp = htq.response(uuid)
         self.assertIsNone(resp)
+
+    @responses.activate
+    def test_id(self):
+        htq.send(url, data='v1', id='foo')
+        htq.send(url, data='v2', id='foo')
+
+        # First request is canceled
+        uuid = htq.pop()
+        req1 = htq.request(uuid)
+        self.assertEqual(req1['status'], htq.CANCELED)
+
+        # Second is queued
+        uuid = htq.pop()
+        req2 = htq.request(uuid)
+        self.assertEqual(req2['status'], htq.QUEUED)

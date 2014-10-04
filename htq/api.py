@@ -35,6 +35,9 @@ DEFAULT_TIMEOUT = 60
 # The requests send queue
 REQ_SEND_QUEUE = 'htq:send'
 
+# Requests by ID
+REQ_IDS = 'htq:ids'
+
 # Key prefix of a hash that stores the requests
 REQ_PREFIX = 'htq:requests:'
 
@@ -107,7 +110,7 @@ def _decode_response(r):
     return r
 
 
-def send(url, method=None, data=None, headers=None, timeout=None):
+def send(url, method=None, data=None, headers=None, id=None, timeout=None):
     "Enqueues an HTTP request."
     client = get_redis_client()
 
@@ -134,10 +137,23 @@ def send(url, method=None, data=None, headers=None, timeout=None):
         'data': data,
         'headers': headers,
         'timeout': timeout,
+        'id': id,
     }
+
+    # If an ID is supplied, cancel the existing request if one
+    # exists and update the id->uuid map
+    if id:
+        _uuid = client.hget(REQ_IDS, id)
+
+        if _uuid:
+            cancel(_uuid)
 
     with client.pipeline() as p:
         p.multi()
+
+        if id:
+            p.hset(REQ_IDS, id, uuid)
+
         p.lpush(REQ_SEND_QUEUE, uuid)
         p.hmset(REQ_PREFIX + uuid, _encode_request(req))
         p.execute()
