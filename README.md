@@ -67,12 +67,27 @@ htq worker
 
 ## API
 
+*Request data must be JSON-encoded and include the `Content-Type: application/json` header.*
+
 - `GET /` - Gets all queued requests.
 - `POST /` - Sends (queues) a request
 - `GET /<uuid>/` - Gets a request by UUID
 - `DELETE /<uuid>/` - Cancels a request, deleting it's response if already received
 - `GET /<uuid>/response/` - Gets a request's response if it has been received
 - `DELETE /<uuid>/response/` - Delete a request's response to clear up space
+
+### Request Attributes
+
+POST data is a JSON-encoded object with the one or more of the following attributes:
+
+- `url` (required) - URL of the request
+- `method` - Request method. Defaults to `GET` or `POST` if `data` is supplied.
+- `data` - Request data in bytes, i.e. encoded for the defined `Content-Type`
+- `headers` - Dict of request headers
+- `timeout` - Seconds to wait before timing out the request.
+- `id` - Unique identifier for the request to support automatic cancellation of a previously queued request with the same `id`.
+
+See examples below in the tutorial.
 
 ## Tutorial
 
