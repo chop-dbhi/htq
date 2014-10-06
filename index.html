@@ -27,22 +27,40 @@
         </ul>
       </header>
       <section>
-        <h1>
-<a name="http-task-queue-htq" class="anchor" href="#http-task-queue-htq"><span class="octicon octicon-link"></span></a>HTTP Task Queue (htq)</h1>
-
-<p>The motivation for this project is to provide a standard interface for sending a request in the background to a service that performs some task with a standard mechanism for signaling it to be <em>cancelled</em>.</p>
+        <p>The motivation for this project is to provide a standard interface for sending a request in the background to a service that performs some task with a standard mechanism for signaling it to be <em>cancelled</em>.</p>
 
 <p>In this context, a <em>task</em> is classified as something that may take longer than what is appropriate for a typical HTTP response or something that is allowed to be eventually completed. Examples include executing a database query, running an analysis on some data, and injesting/scraping data from websites or other services. One side effect of the client-server model is that the server may not be aware if the client aborts the request. The server will continue to perform the task using up resources that other tasks or request handlers could be using. The mechanism for signaling a cancellation is for a subsequent DELETE request to be sent to the service which can be handled to interrupt the first request. This of course requires services to support the DELETE method and implement the logic for cancelling the task being performed. See below for a working example of a <a href="#service-example">service</a> implementing this interface.</p>
 
-<p>For a detailed introduction, read the <a href="#tutorial">tutorial</a> below. </p>
+<p>For a detailed introduction, read the <a href="#tutorial">tutorial</a> below.</p>
 
 <h2>
-<a name="dependencies" class="anchor" href="#dependencies"><span class="octicon octicon-link"></span></a>Dependencies</h2>
+<a name="docker" class="anchor" href="#docker"><span class="octicon octicon-link"></span></a>Docker</h2>
+
+<p><em>Requires a Redis 2.4+ container.</em></p>
+
+<p>Run the server on local port 5000.</p>
+
+<pre><code>docker run -d --link redis:redis --publish 5000:5000 bruth/htq server
+</code></pre>
+
+<p>Run a worker.</p>
+
+<pre><code>docker run -d --link redis:redis bruth/htq worker
+</code></pre>
+
+<h2>
+<a name="manual-install" class="anchor" href="#manual-install"><span class="octicon octicon-link"></span></a>Manual Install</h2>
+
+<h3>
+<a name="dependencies" class="anchor" href="#dependencies"><span class="octicon octicon-link"></span></a>Dependencies</h3>
 
 <ul>
 <li>Python 3.3+</li>
 <li>Redis 2.4+</li>
-</ul><h2>
+</ul><pre><code>pip install htq
+</code></pre>
+
+<h2>
 <a name="command-line-interface" class="anchor" href="#command-line-interface"><span class="octicon octicon-link"></span></a>Command-line Interface</h2>
 
 <pre><code>$ htq -h
@@ -75,6 +93,8 @@ Options:
 <h2>
 <a name="api" class="anchor" href="#api"><span class="octicon octicon-link"></span></a>API</h2>
 
+<p><em>Request data must be JSON-encoded and include the <code>Content-Type: application/json</code> header.</em></p>
+
 <ul>
 <li>
 <code>GET /</code> - Gets all queued requests.</li>
@@ -88,7 +108,28 @@ Options:
 <code>GET /&lt;uuid&gt;/response/</code> - Gets a request's response if it has been received</li>
 <li>
 <code>DELETE /&lt;uuid&gt;/response/</code> - Delete a request's response to clear up space</li>
-</ul><h2>
+</ul><h3>
+<a name="request-attributes" class="anchor" href="#request-attributes"><span class="octicon octicon-link"></span></a>Request Attributes</h3>
+
+<p>POST data is a JSON-encoded object with the one or more of the following attributes:</p>
+
+<ul>
+<li>
+<code>url</code> (required) - URL of the request</li>
+<li>
+<code>method</code> - Request method. Defaults to <code>GET</code> or <code>POST</code> if <code>data</code> is supplied.</li>
+<li>
+<code>data</code> - Request data in bytes, i.e. encoded for the defined <code>Content-Type</code>
+</li>
+<li>
+<code>headers</code> - Dict of request headers</li>
+<li>
+<code>timeout</code> - Seconds to wait before timing out the request.</li>
+<li>
+<code>id</code> - Unique identifier for the request to support automatic cancellation of a previously queued request with the same <code>id</code>.</li>
+</ul><p>See examples below in the tutorial.</p>
+
+<h2>
 <a name="tutorial" class="anchor" href="#tutorial"><span class="octicon octicon-link"></span></a>Tutorial</h2>
 
 <p>Start the HTQ server:</p>
