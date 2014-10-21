@@ -11,7 +11,7 @@ client = get_redis_client()
 
 class TestCase(unittest.TestCase):
     def setUp(self):
-        client.flushdb()
+        htq.flush()
 
         responses.add(responses.GET,
                       url=url,

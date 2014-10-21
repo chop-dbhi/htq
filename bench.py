@@ -30,10 +30,8 @@ def run(n):
 
 
 if __name__ == '__main__':
-    from htq.api import get_redis_client
 
-    c = get_redis_client()
-    c.flushdb()
+    htq.flush()
 
     if sys.argv[1:]:
         n = int(sys.argv[1])
