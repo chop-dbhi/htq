@@ -52,6 +52,7 @@ def queue():
         reqs.append(req)
 
     resp = make_response(json.dumps(reqs), 200)
+    resp.headers['Content-Type'] = 'application/json'
     resp.headers['Link'] = build_link_header({
         url_for('queue', _external=True): {
             'rel': 'self',
