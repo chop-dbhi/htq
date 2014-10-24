@@ -27,7 +27,7 @@ def parse_header_links(value):
 
 class TestCase(unittest.TestCase):
     def setUp(self):
-        client.flushdb()
+        htq.flush()
 
         responses.add(responses.GET,
                       url=url,

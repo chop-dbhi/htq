@@ -18,6 +18,7 @@ __all__ = (
     'push',
     'cancel',
     'purge',
+    'flush',
     'size',
     'logger',
     'SUCCESS',
@@ -305,6 +306,13 @@ def purge(uuid):
     client = get_redis_client()
 
     return client.delete(RESP_PREFIX + uuid)
+
+
+def flush():
+    "Flush htq keys from redis"
+    client = get_redis_client()
+    prefixes = [REQ_IDS, REQ_PREFIX, REQ_SEND_QUEUE, RESP_PREFIX]
+    client.delete(*prefixes)
 
 
 def receive(uuid):
