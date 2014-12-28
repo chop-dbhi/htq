@@ -13,13 +13,13 @@ For a detailed introduction, read the [tutorial](#tutorial) below.
 Run the server on local port 5000.
 
 ```
-docker run -d --link redis:redis --publish 5000:5000 bruth/htq server
+docker run -d --link redis:redis --publish 5000:5000 dbhi/htq server
 ```
 
 Run a worker.
 
 ```
-docker run -d --link redis:redis bruth/htq worker
+docker run -d --link redis:redis dbhi/htq worker
 ```
 
 ## Manual Install
